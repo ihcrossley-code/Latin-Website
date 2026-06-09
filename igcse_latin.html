@@ -942,6 +942,21 @@ table th, table td, .vocab-entry, .section-header,
 .auth-signed-in-info { margin-bottom: 1rem; font-size: 0.88rem; }
 .auth-signed-in-info strong { color: var(--accent); }
 .auth-signed-in-note { margin-bottom: 1.2rem; font-size: 0.8rem; color: var(--muted); line-height: 1.5; }
+/* Account panel */
+.auth-avatar { width:52px;height:52px;border-radius:50%;background:var(--accent);color:#fff;font-size:1.4rem;font-weight:700;display:flex;align-items:center;justify-content:center;margin:0 auto 0.9rem; }
+.auth-acct-email { font-size:0.9rem;font-weight:600;text-align:center;margin-bottom:0.25rem;word-break:break-all; }
+.auth-acct-meta { display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap;margin-bottom:1.2rem; }
+.auth-badge { font-size:0.72rem;padding:2px 8px;border-radius:99px;font-weight:600; }
+.auth-badge-verified { background:rgba(74,222,128,.15);color:#16a34a; }
+.auth-badge-unverified { background:rgba(251,191,36,.15);color:#b45309; }
+.auth-badge-provider { background:var(--card-bg);border:1px solid var(--border);color:var(--muted); }
+.auth-chpw { margin-bottom:1rem;padding:0.8rem;border:1px solid var(--border);border-radius:8px;background:var(--card-bg); }
+.auth-chpw summary { font-size:0.82rem;font-weight:600;cursor:pointer;color:var(--muted); }
+.auth-chpw summary:hover { color:var(--text); }
+.auth-chpw .auth-field { margin-top:0.7rem; }
+.auth-acct-actions { display:flex;flex-direction:column;gap:0.6rem; }
+.auth-btn-secondary { padding:0.5rem 1rem;border:1px solid var(--border);background:transparent;color:var(--text);border-radius:8px;cursor:pointer;font-size:0.85rem;transition:background .15s; }
+.auth-btn-secondary:hover { background:var(--card-bg); }
 
 </style>
 <script src="supabase.min.js"></script>
@@ -1033,9 +1048,13 @@ table th, table td, .vocab-entry, .section-header,
       <div class="home-stat"><span class="num">20+</span><span class="lbl">syntax structures</span></div>
     </div>
     <div class="home-quick-links">
-      <a href="#nouns">Nouns &amp; Adjectives</a>
+      <a href="#nouns">Nouns</a>
+      <a href="#adjectives">Adjectives</a>
       <a href="#pronouns">Pronouns &amp; Numbers</a>
       <a href="#verbs">Verbs</a>
+      <a href="#adverbs">Adverbs</a>
+      <a href="#prepositions">Prepositions</a>
+      <a href="#conjunctions">Conjunctions</a>
       <a href="#syntax">Syntax</a>
       <a href="#vocab">Vocabulary</a>
     </div>
@@ -2491,9 +2510,24 @@ table th, table td, .vocab-entry, .section-header,
       </button>
     </div>
     <div id="authPanelSignedIn" style="display:none">
-      <p class="auth-signed-in-info">Signed in as <strong id="authUserEmail"></strong></p>
-      <p class="auth-signed-in-note">Your starred words, preferences, and settings sync automatically across devices.</p>
-      <button class="auth-btn-primary" id="authSignOutBtn" style="background:var(--muted)">Sign Out</button>
+      <div class="auth-avatar" id="authAvatar">?</div>
+      <p class="auth-acct-email" id="authUserEmail"></p>
+      <div class="auth-acct-meta">
+        <span class="auth-badge auth-badge-provider" id="authProviderBadge"></span>
+        <span class="auth-badge" id="authVerifiedBadge"></span>
+      </div>
+      <details class="auth-chpw" id="authChPwSection" style="display:none">
+        <summary>Change password</summary>
+        <div class="auth-field">
+          <label for="authNewPw">New password</label>
+          <input type="password" id="authNewPw" placeholder="At least 6 characters" autocomplete="new-password">
+        </div>
+        <button class="auth-btn-primary" id="authChPwBtn" style="margin-top:0.5rem">Update Password</button>
+      </details>
+      <div class="auth-acct-actions">
+        <button class="auth-btn-primary" id="authSignOutBtn" style="background:var(--muted)">Sign Out</button>
+        <button class="auth-btn-secondary" id="authSwitchBtn">Switch Account</button>
+      </div>
     </div>
     <div id="authMsg" class="auth-msg"></div>
   </div>
@@ -2709,20 +2743,58 @@ setTimeout(function() { try {
     window._authCloseModal && window._authCloseModal();
   });
 
+  // Switch account — sign out then reopen to sign-in tab
+  document.getElementById('authSwitchBtn').addEventListener('click', async () => {
+    await _sb.auth.signOut();
+    // reopen on sign-in tab (state change will call updateAuthUI)
+  });
+
+  // Change password
+  document.getElementById('authChPwBtn').addEventListener('click', async () => {
+    const pw  = document.getElementById('authNewPw').value;
+    const btn = document.getElementById('authChPwBtn');
+    if (!pw || pw.length < 6) { showMsg('Password must be at least 6 characters.', 'error'); return; }
+    btn.disabled = true; btn.textContent = 'Updating…';
+    const { error } = await _sb.auth.updateUser({ password: pw });
+    btn.disabled = false; btn.textContent = 'Update Password';
+    if (error) showMsg(error.message, 'error');
+    else { showMsg('Password updated.', 'success'); document.getElementById('authNewPw').value = ''; }
+  });
+
   // Update button + panels to reflect current auth state
   function updateAuthUI() {
     if (_currentUser) {
-      authBtn.textContent             = '👤 ' + (_currentUser.email?.split('@')[0] || 'Account');
-      tabs.style.display              = 'none';
-      panelSignIn.style.display       = 'none';
-      panelSignUp.style.display       = 'none';
-      panelSignedIn.style.display     = '';
-      document.getElementById('authUserEmail').textContent = _currentUser.email || '';
+      authBtn.textContent         = '👤 Account';
+      tabs.style.display          = 'none';
+      panelSignIn.style.display   = 'none';
+      panelSignUp.style.display   = 'none';
+      panelSignedIn.style.display = '';
+
+      // Avatar initial
+      const email    = _currentUser.email || '';
+      const provider = (_currentUser.app_metadata?.provider) || 'email';
+      const verified = _currentUser.email_confirmed_at ? true : false;
+
+      const avatarEl   = document.getElementById('authAvatar');
+      const emailEl    = document.getElementById('authUserEmail');
+      const provBadge  = document.getElementById('authProviderBadge');
+      const verBadge   = document.getElementById('authVerifiedBadge');
+      const chPwSection = document.getElementById('authChPwSection');
+
+      if (avatarEl)  avatarEl.textContent  = email.charAt(0).toUpperCase() || '?';
+      if (emailEl)   emailEl.textContent   = email;
+      if (provBadge) provBadge.textContent = provider === 'google' ? '🔵 Google' : '✉ Email';
+      if (verBadge) {
+        verBadge.textContent  = verified ? '✓ Verified' : '⚠ Unverified';
+        verBadge.className    = 'auth-badge ' + (verified ? 'auth-badge-verified' : 'auth-badge-unverified');
+      }
+      // Show change-password only for email users
+      if (chPwSection) chPwSection.style.display = (provider === 'email') ? '' : 'none';
     } else {
-      authBtn.textContent             = '👤 Sign In';
-      tabs.style.display              = '';
-      panelSignedIn.style.display     = 'none';
-      panelSignIn.style.display       = '';
+      authBtn.textContent         = '👤 Sign In';
+      tabs.style.display          = '';
+      panelSignedIn.style.display = 'none';
+      panelSignIn.style.display   = '';
       document.getElementById('authTabSignIn').classList.add('active');
       document.getElementById('authTabSignUp').classList.remove('active');
     }

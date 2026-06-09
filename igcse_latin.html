@@ -4122,52 +4122,46 @@ function nounForms(nom,t,out){
   const isN=/\bn\b/.test(t);
   if(decl===1){for(const f of[stem+'a',stem+'am',stem+'ae',stem+'ae',stem+'a',stem+'ae',stem+'as',stem+'arum',stem+'is',stem+'is'])out.add(f);}else if(decl===2){if(isN||nom.endsWith('um')){for(const f of[nom,nom,stem+'i',stem+'o',stem+'o',stem+'a',stem+'a',stem+'orum',stem+'is',stem+'is'])out.add(f);}else{for(const f of[nom,stem+'um',stem+'i',stem+'o',stem+'o'])out.add(f);if(nom.endsWith('us'))out.add(nom.replace(/us$/,'e'));for(const f of[stem+'i',stem+'os',stem+'orum',stem+'is',stem+'is'])out.add(f);}}else if(decl===3){if(isN){for(const f of[nom,nom,stem+'is',stem+'i',stem+'e',stem+'a',stem+'a',stem+'um',stem+'ium',stem+'ibus',stem+'ibus'])out.add(f);}else{for(const f of[nom,stem+'em',stem+'is',stem+'i',stem+'e',stem+'es',stem+'es',stem+'um',stem+'ium',stem+'ibus',stem+'ibus'])out.add(f);}}else if(decl===4){for(const f of[nom,stem+'um',nom,stem+'ui',stem+'u',nom,nom,stem+'uum',stem+'ibus',stem+'ibus'])out.add(f);}else if(decl===5){for(const f of[nom,stem+'em',stem+'ei',stem+'ei',stem+'e',nom,nom,stem+'erum',stem+'ebus',stem+'ebus'])out.add(f);}
 }
-// ── SOUND & VISUAL EFFECTS ──────────────────────────────────────
+
 // ── SOUND ENGINE ────────────────────────────────────────────────
 const SFX = (() => {
   let ctx = null, vol = 0.5;
-
   function getCtx() {
     if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
-    // Resume suspended context (required by browser autoplay policy)
     if (ctx.state === 'suspended') ctx.resume();
     return ctx;
   }
-
   function tone(freq, dur, gain, freqEnd) {
     if (vol <= 0) return;
     try {
       const c = getCtx();
       const now = c.currentTime;
       const osc = c.createOscillator();
-      const g   = c.createGain();
-      osc.connect(g);
-      g.connect(c.destination);
+      const g = c.createGain();
+      osc.connect(g); g.connect(c.destination);
       osc.type = 'sine';
       osc.frequency.setValueAtTime(freq, now);
       if (freqEnd) osc.frequency.linearRampToValueAtTime(freqEnd, now + dur);
       g.gain.setValueAtTime(0, now);
       g.gain.linearRampToValueAtTime(gain * vol, now + 0.01);
       g.gain.linearRampToValueAtTime(0, now + dur);
-      osc.start(now);
-      osc.stop(now + dur + 0.01);
-    } catch(err) { /* silently ignore e.g. page hidden */ }
+      osc.start(now); osc.stop(now + dur + 0.01);
+    } catch(err) {}
   }
-
   return {
-    setVol(v)      { vol = v; },
-    click()        { tone(540, 0.05, 0.08); },
-    nav()          { tone(420, 0.06, 0.05); },
-    star()         { tone(880, 0.12, 0.10); setTimeout(() => tone(1100, 0.10, 0.07), 60); },
-    unstar()       { tone(480, 0.10, 0.07, 360); },
-    expand()       { tone(280, 0.13, 0.06, 400); },
-    collapse()     { tone(400, 0.11, 0.06, 260); },
-    modalOpen()    { tone(600, 0.08, 0.08); setTimeout(() => tone(740, 0.06, 0.06), 50); },
-    modalClose()   { tone(460, 0.08, 0.07, 380); },
-    filter()       { tone(500, 0.07, 0.07); },
-    searchFound()  { tone(660, 0.15, 0.07); },
-    searchEmpty()  { tone(280, 0.12, 0.05, 240); },
-    darkToggle()   { tone(520, 0.09, 0.06, 680); },
+    setVol(v)     { vol = v; },
+    click()       { tone(540, 0.05, 0.08); },
+    nav()         { tone(420, 0.06, 0.05); },
+    star()        { tone(880, 0.12, 0.10); setTimeout(() => tone(1100, 0.10, 0.07), 60); },
+    unstar()      { tone(480, 0.10, 0.07, 360); },
+    expand()      { tone(280, 0.13, 0.06, 400); },
+    collapse()    { tone(400, 0.11, 0.06, 260); },
+    modalOpen()   { tone(600, 0.08, 0.08); setTimeout(() => tone(740, 0.06, 0.06), 50); },
+    modalClose()  { tone(460, 0.08, 0.07, 380); },
+    filter()      { tone(500, 0.07, 0.07); },
+    searchFound() { tone(660, 0.15, 0.07); },
+    searchEmpty() { tone(280, 0.12, 0.05, 240); },
+    darkToggle()  { tone(520, 0.09, 0.06, 680); },
   };
 })();
 
@@ -4177,50 +4171,41 @@ function doRipple(el, e) {
   const size = Math.max(rect.width, rect.height) * 2;
   const r = document.createElement('span');
   r.className = 'ripple-wave';
-  r.style.width  = r.style.height = size + 'px';
-  r.style.left   = (e.clientX - rect.left  - size / 2) + 'px';
-  r.style.top    = (e.clientY - rect.top   - size / 2) + 'px';
+  r.style.width = r.style.height = size + 'px';
+  r.style.left = (e.clientX - rect.left - size / 2) + 'px';
+  r.style.top  = (e.clientY - rect.top  - size / 2) + 'px';
   el.appendChild(r);
   r.addEventListener('animationend', () => r.remove(), { once: true });
 }
 
-// Ensure buttons that receive ripples have position:relative & overflow:hidden
 document.querySelectorAll('.btn-toggle').forEach(btn => {
   btn.style.position = 'relative';
   btn.style.overflow = 'hidden';
   btn.addEventListener('click', e => { doRipple(btn, e); SFX.click(); });
 });
 
-// Sidebar nav
 document.querySelectorAll('aside.sidebar a').forEach(a => {
   a.addEventListener('click', () => SFX.nav());
 });
 
-// Star buttons (delegated — works for dynamically created entries too)
 document.addEventListener('click', e => {
   const sb = e.target.closest('.star-btn');
   if (!sb) return;
-  // Read state BEFORE existing handler changes it
   const willStar = sb.textContent.trim() === '☆';
   willStar ? SFX.star() : SFX.unstar();
-  // Bounce animation — remove then re-add class to restart if already running
-  sb.classList.remove('star-pop');
-  void sb.offsetWidth;
+  sb.classList.remove('star-pop'); void sb.offsetWidth;
   sb.classList.add('star-pop');
   sb.addEventListener('animationend', () => sb.classList.remove('star-pop'), { once: true });
-}, true); // capture phase so we read ☆/★ before handler flips it
+}, true);
 
-// Vocab entry flash (delegated)
 document.addEventListener('click', e => {
   const entry = e.target.closest('#main-vocab-grid .vocab-entry, #starred-grid .vocab-entry');
   if (!entry || e.target.closest('.star-btn')) return;
-  entry.classList.remove('entry-flash');
-  void entry.offsetWidth;
+  entry.classList.remove('entry-flash'); void entry.offsetWidth;
   entry.classList.add('entry-flash');
   entry.addEventListener('animationend', () => entry.classList.remove('entry-flash'), { once: true });
 });
 
-// Section expand/collapse sound
 document.querySelectorAll('.section-header').forEach(hdr => {
   hdr.addEventListener('click', () => {
     const body = hdr.nextElementSibling;
@@ -4229,10 +4214,10 @@ document.querySelectorAll('.section-header').forEach(hdr => {
   });
 });
 
-// Volume slider in settings
+// ── VOLUME SLIDER ────────────────────────────────────────────────
 (function() {
-  const slider = document.getElementById('vol-slider');
-  const volVal = document.getElementById('vol-val');
+  const slider  = document.getElementById('vol-slider');
+  const volVal  = document.getElementById('vol-val');
   const volIcon = document.getElementById('vol-icon');
   function iconFor(v) { return v === 0 ? '🔇' : v < 35 ? '🔈' : v < 70 ? '🔉' : '🔊'; }
   function applyVol(v) {
@@ -4250,19 +4235,15 @@ document.querySelectorAll('.section-header').forEach(hdr => {
 
 </script>
 
-<!-- ── AUTH MODAL ──────────────────────────────────────────────── -->
+<!-- AUTH MODAL -->
 <div class="auth-modal-overlay" id="authModalOverlay">
   <div class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="authModalTitle">
-    <button class="auth-modal-close" id="authModalClose" aria-label="Close">×</button>
+    <button class="auth-modal-close" id="authModalClose" aria-label="Close">&times;</button>
     <h2 id="authModalTitle">Account</h2>
-
-    <!-- Sign-in / sign-up tabs (hidden when signed in) -->
     <div class="auth-tabs" id="authTabs">
       <button class="auth-tab active" id="authTabSignIn">Sign In</button>
       <button class="auth-tab" id="authTabSignUp">Sign Up</button>
     </div>
-
-    <!-- Sign-in panel -->
     <div id="authPanelSignIn">
       <div class="auth-field">
         <label for="authEmail">Email</label>
@@ -4279,8 +4260,6 @@ document.querySelectorAll('.section-header').forEach(hdr => {
         Continue with Google
       </button>
     </div>
-
-    <!-- Sign-up panel -->
     <div id="authPanelSignUp" style="display:none">
       <div class="auth-field">
         <label for="authEmailUp">Email</label>
@@ -4297,14 +4276,11 @@ document.querySelectorAll('.section-header').forEach(hdr => {
         Continue with Google
       </button>
     </div>
-
-    <!-- Signed-in panel -->
     <div id="authPanelSignedIn" style="display:none">
       <p class="auth-signed-in-info">Signed in as <strong id="authUserEmail"></strong></p>
       <p class="auth-signed-in-note">Your starred words, preferences, and settings sync automatically across devices.</p>
       <button class="auth-btn-primary" id="authSignOutBtn" style="background:var(--muted)">Sign Out</button>
     </div>
-
     <div id="authMsg" class="auth-msg"></div>
   </div>
 </div>

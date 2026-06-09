@@ -2557,29 +2557,14 @@ async function _loadFromCloud() {
 }
 
 // ── AUTH MODAL ───────────────────────────────────────────────────
-// Deferred so existing buttons/search/etc. always initialise first,
-// and wrapped in try-catch so any auth error can never crash the page.
-setTimeout(function() { try {
-  if (!_sb) {
-    const btn = document.getElementById('authBtn');
-    if (btn) btn.style.display = 'none';
-    return;
-  }
-  const overlay       = document.getElementById('authModalOverlay');
-  const closeBtn      = document.getElementById('authModalClose');
-  const authBtn       = document.getElementById('authBtn');
-  const tabSignIn     = document.getElementById('authTabSignIn');
-  const tabSignUp     = document.getElementById('authTabSignUp');
-  const tabs          = document.getElementById('authTabs');
-  const panelSignIn   = document.getElementById('authPanelSignIn');
-  const panelSignUp   = document.getElementById('authPanelSignUp');
-  const panelSignedIn = document.getElementById('authPanelSignedIn');
-  const msgEl         = document.getElementById('authMsg');
+// Part 1: modal open/close — runs immediately, always works
+(function() {
+  const overlay = document.getElementById('authModalOverlay');
+  const authBtn = document.getElementById('authBtn');
+  const closeBtn = document.getElementById('authModalClose');
+  const msgEl   = document.getElementById('authMsg');
 
-  function showMsg(text, type) { msgEl.textContent = text; msgEl.className = 'auth-msg ' + type; }
-  function clearMsg()          { msgEl.className = 'auth-msg'; msgEl.textContent = ''; }
-
-  function openModal()  { overlay.classList.add('open'); clearMsg(); }
+  function openModal()  { overlay.classList.add('open'); msgEl.className = 'auth-msg'; msgEl.textContent = ''; }
   function closeModal() { overlay.classList.remove('open'); }
 
   authBtn.addEventListener('click', openModal);
@@ -2590,16 +2575,38 @@ setTimeout(function() { try {
   });
 
   // Tab switching
+  const tabSignIn   = document.getElementById('authTabSignIn');
+  const tabSignUp   = document.getElementById('authTabSignUp');
+  const panelSignIn = document.getElementById('authPanelSignIn');
+  const panelSignUp = document.getElementById('authPanelSignUp');
   tabSignIn.addEventListener('click', () => {
-    tabSignIn.classList.add('active'); tabSignUp.classList.remove('active');
-    panelSignIn.style.display = ''; panelSignUp.style.display = 'none';
-    clearMsg();
+    tabSignIn.classList.add('active');   tabSignUp.classList.remove('active');
+    panelSignIn.style.display = '';      panelSignUp.style.display = 'none';
+    msgEl.className = 'auth-msg';
   });
   tabSignUp.addEventListener('click', () => {
-    tabSignUp.classList.add('active'); tabSignIn.classList.remove('active');
-    panelSignUp.style.display = ''; panelSignIn.style.display = 'none';
-    clearMsg();
+    tabSignUp.classList.add('active');   tabSignIn.classList.remove('active');
+    panelSignUp.style.display = '';      panelSignIn.style.display = 'none';
+    msgEl.className = 'auth-msg';
   });
+
+  // Expose closeModal globally so Supabase part can call it
+  window._authCloseModal = closeModal;
+})();
+
+// Part 2: Supabase auth calls — deferred + try-catch so failures never affect rest of page
+setTimeout(function() { try {
+  if (!_sb) return;
+
+  const overlay       = document.getElementById('authModalOverlay');
+  const authBtn       = document.getElementById('authBtn');
+  const tabs          = document.getElementById('authTabs');
+  const panelSignIn   = document.getElementById('authPanelSignIn');
+  const panelSignUp   = document.getElementById('authPanelSignUp');
+  const panelSignedIn = document.getElementById('authPanelSignedIn');
+  const msgEl         = document.getElementById('authMsg');
+
+  function showMsg(text, type) { msgEl.textContent = text; msgEl.className = 'auth-msg ' + type; }
 
   // Email sign-in
   async function doSignIn() {
@@ -2611,10 +2618,10 @@ setTimeout(function() { try {
     const { error } = await _sb.auth.signInWithPassword({ email, password });
     btn.disabled = false; btn.textContent = 'Sign In';
     if (error) showMsg(error.message, 'error');
-    else closeModal();
+    else window._authCloseModal && window._authCloseModal();
   }
   document.getElementById('authSignInBtn').addEventListener('click', doSignIn);
-  document.getElementById('authEmail').addEventListener('keydown', e => { if (e.key === 'Enter') doSignIn(); });
+  document.getElementById('authEmail').addEventListener('keydown',    e => { if (e.key === 'Enter') doSignIn(); });
   document.getElementById('authPassword').addEventListener('keydown', e => { if (e.key === 'Enter') doSignIn(); });
 
   // Email sign-up
@@ -2628,7 +2635,7 @@ setTimeout(function() { try {
     const { error } = await _sb.auth.signUp({ email, password });
     btn.disabled = false; btn.textContent = 'Create Account';
     if (error) showMsg(error.message, 'error');
-    else showMsg('Check your email to confirm your account, then sign in.', 'success');
+    else showMsg('Account created — check your email to confirm, then sign in.', 'success');
   }
   document.getElementById('authSignUpBtn').addEventListener('click', doSignUp);
   document.getElementById('authPasswordUp').addEventListener('keydown', e => { if (e.key === 'Enter') doSignUp(); });
@@ -2647,42 +2654,41 @@ setTimeout(function() { try {
   // Sign out
   document.getElementById('authSignOutBtn').addEventListener('click', async () => {
     await _sb.auth.signOut();
-    closeModal();
+    window._authCloseModal && window._authCloseModal();
   });
 
-  // Update header button + modal panels based on auth state
+  // Update button + panels to reflect current auth state
   function updateAuthUI() {
     if (_currentUser) {
-      const name = _currentUser.email?.split('@')[0] || 'Account';
-      authBtn.textContent = '👤 ' + name;
-      tabs.style.display          = 'none';
-      panelSignIn.style.display   = 'none';
-      panelSignUp.style.display   = 'none';
-      panelSignedIn.style.display = '';
+      authBtn.textContent             = '👤 ' + (_currentUser.email?.split('@')[0] || 'Account');
+      tabs.style.display              = 'none';
+      panelSignIn.style.display       = 'none';
+      panelSignUp.style.display       = 'none';
+      panelSignedIn.style.display     = '';
       document.getElementById('authUserEmail').textContent = _currentUser.email || '';
     } else {
-      authBtn.textContent = '👤 Sign In';
-      tabs.style.display          = '';
-      panelSignedIn.style.display = 'none';
-      panelSignIn.style.display   = '';
-      tabSignIn.classList.add('active'); tabSignUp.classList.remove('active');
+      authBtn.textContent             = '👤 Sign In';
+      tabs.style.display              = '';
+      panelSignedIn.style.display     = 'none';
+      panelSignIn.style.display       = '';
+      document.getElementById('authTabSignIn').classList.add('active');
+      document.getElementById('authTabSignUp').classList.remove('active');
     }
   }
 
-  // Auth state listener (fires on sign-in, sign-out, token refresh)
   _sb.auth.onAuthStateChange(async (event, session) => {
     _currentUser = session?.user ?? null;
     updateAuthUI();
     if (event === 'SIGNED_IN') await _loadFromCloud();
   });
 
-  // Restore session on page load (handles OAuth redirect)
   _sb.auth.getSession().then(({ data: { session } }) => {
     _currentUser = session?.user ?? null;
     updateAuthUI();
     if (_currentUser) _loadFromCloud();
   });
-} catch(e) { console.warn('Auth init error:', e); } }, 0);
+
+} catch(e) { console.warn('Auth error:', e); } }, 0);
 
 // ── HEADER HEIGHT SYNC ───────────────────────────────────────────
 // ── GLOBAL SEARCH ────────────────────────────────────────────────

@@ -2557,9 +2557,10 @@ async function _loadFromCloud() {
 }
 
 // ── AUTH MODAL ───────────────────────────────────────────────────
-(function() {
+// Deferred so existing buttons/search/etc. always initialise first,
+// and wrapped in try-catch so any auth error can never crash the page.
+setTimeout(function() { try {
   if (!_sb) {
-    // Supabase CDN failed to load — hide auth button gracefully
     const btn = document.getElementById('authBtn');
     if (btn) btn.style.display = 'none';
     return;
@@ -2681,7 +2682,7 @@ async function _loadFromCloud() {
     updateAuthUI();
     if (_currentUser) _loadFromCloud();
   });
-})();
+} catch(e) { console.warn('Auth init error:', e); } }, 0);
 
 // ── HEADER HEIGHT SYNC ───────────────────────────────────────────
 // ── GLOBAL SEARCH ────────────────────────────────────────────────

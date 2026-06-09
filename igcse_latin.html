@@ -814,7 +814,137 @@ table th, table td, .vocab-entry, .section-header,
 /* Filter button: needs overflow:hidden for ripple */
 .vf-btn { position: relative; overflow: hidden; }
 
+/* ── AUTH MODAL ──────────────────────────────────── */
+.auth-modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.52);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+}
+.auth-modal-overlay.open { display: flex; }
+.auth-modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 2rem;
+  width: min(420px, calc(100vw - 2rem));
+  box-shadow: 0 8px 32px rgba(0,0,0,0.22);
+  font-family: sans-serif;
+  color: var(--text);
+  position: relative;
+}
+.auth-modal h2 { font-size: 1.2rem; margin: 0 0 1.2rem; font-weight: 600; }
+.auth-tabs { display: flex; margin-bottom: 1.4rem; border-bottom: 2px solid var(--border); }
+.auth-tab {
+  background: none;
+  border: none;
+  padding: 0.45rem 1.1rem 0.55rem;
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-family: sans-serif;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: color 0.12s;
+}
+.auth-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+.auth-field { margin-bottom: 0.9rem; }
+.auth-field label { display: block; font-size: 0.8rem; margin-bottom: 0.28rem; color: var(--muted); }
+.auth-field input {
+  width: 100%;
+  padding: 0.52rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  font-size: 0.9rem;
+  font-family: sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.12s;
+}
+.auth-field input:focus { border-color: var(--accent); }
+.auth-btn-primary {
+  width: 100%;
+  padding: 0.62rem;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-size: 0.9rem;
+  font-family: sans-serif;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  margin-top: 0.2rem;
+}
+.auth-btn-primary:hover { opacity: 0.87; }
+.auth-btn-primary:disabled { opacity: 0.48; cursor: not-allowed; }
+.auth-divider {
+  text-align: center;
+  margin: 0.9rem 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  position: relative;
+}
+.auth-divider::before, .auth-divider::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 42%;
+  height: 1px;
+  background: var(--border);
+}
+.auth-divider::before { left: 0; }
+.auth-divider::after { right: 0; }
+.auth-btn-google {
+  width: 100%;
+  padding: 0.58rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  font-size: 0.86rem;
+  font-family: sans-serif;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  color: var(--text);
+  transition: background 0.12s;
+}
+.auth-btn-google:hover { background: var(--accent-light); }
+.auth-msg {
+  font-size: 0.8rem;
+  margin-top: 0.75rem;
+  padding: 0.48rem 0.65rem;
+  border-radius: 4px;
+  display: none;
+}
+.auth-msg.error { background: rgba(180,40,40,0.1); color: #b42828; display: block; }
+.auth-msg.success { background: rgba(40,160,90,0.1); color: #1a7a40; display: block; }
+[data-theme="dark"] .auth-msg.error { color: #e07070; }
+[data-theme="dark"] .auth-msg.success { color: #5ecf8a; }
+.auth-modal-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.85rem;
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  cursor: pointer;
+  color: var(--muted);
+  line-height: 1;
+  padding: 0.2rem 0.4rem;
+}
+.auth-modal-close:hover { color: var(--text); }
+.auth-signed-in-info { margin-bottom: 1rem; font-size: 0.88rem; }
+.auth-signed-in-info strong { color: var(--accent); }
+.auth-signed-in-note { margin-bottom: 1.2rem; font-size: 0.8rem; color: var(--muted); line-height: 1.5; }
+
 </style>
+<script src="supabase.min.js"></script>
 </head>
 <body>
 
@@ -826,6 +956,7 @@ table th, table td, .vocab-entry, .section-header,
   <div class="header-right">
     <div class="header-controls">
       <button class="btn-toggle" id="collapseAllBtn" title="Collapse all sections">↕ Collapse All</button>
+      <button class="btn-toggle" id="authBtn" title="Account">👤 Sign In</button>
       <div style="position:relative">
         <button class="btn-toggle" id="settingsBtn" title="Settings">⚙ Settings</button>
         <div id="settings-panel" class="settings-panel" hidden>
@@ -2318,6 +2449,240 @@ table th, table td, .vocab-entry, .section-header,
 </div>
 
 <script>
+// ── SUPABASE CONFIG ──────────────────────────────────────────────
+// Replace the two strings below with your Supabase project URL and anon key.
+// See SUPABASE_SETUP.md for step-by-step instructions.
+const SUPABASE_URL      = 'https://tvmocqvqnncgkiurmjik.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR2bW9jcXZxbm5jZ2tpdXJtamlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5ODI2NjEsImV4cCI6MjA5NjU1ODY2MX0.C097y7ca2uosDUe6i0vbzmFkzs0hGQnShS1KmUEgjEg';
+
+const _sb = (typeof supabase !== 'undefined')
+  ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  : null;
+let _currentUser = null;
+let _syncTimer   = null;
+
+// ── CLOUD STATE HELPERS ──────────────────────────────────────────
+function _getLocalState() {
+  return {
+    starred:   JSON.parse(localStorage.getItem('latin-starred') || '[]'),
+    theme:     localStorage.getItem('latin-theme')    || 'light',
+    font_size: parseInt(localStorage.getItem('latin-font-size') || '15', 10),
+    vol:       parseInt(localStorage.getItem('latin-vol')       || '50', 10),
+  };
+}
+
+async function _syncToCloud() {
+  if (!_sb || !_currentUser) return;
+  const s = _getLocalState();
+  await _sb.from('user_data').upsert({
+    id:         _currentUser.id,
+    starred:    s.starred,
+    theme:      s.theme,
+    font_size:  s.font_size,
+    vol:        s.vol,
+    updated_at: new Date().toISOString(),
+  });
+}
+
+// Debounced — call after any localStorage write; batches rapid slider changes
+function scheduleSyncToCloud() {
+  if (!_sb || !_currentUser) return;
+  clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(_syncToCloud, 1500);
+}
+
+async function _loadFromCloud() {
+  if (!_sb || !_currentUser) return;
+  const { data, error } = await _sb
+    .from('user_data')
+    .select('*')
+    .eq('id', _currentUser.id)
+    .single();
+  if (error || !data) return;
+
+  // Starred words
+  if (Array.isArray(data.starred) && data.starred.length > 0) {
+    localStorage.setItem('latin-starred', JSON.stringify(data.starred));
+    if (typeof starred !== 'undefined') {
+      starred = new Set(data.starred);
+      document.querySelectorAll('.vocab-entry').forEach(entry => {
+        const lat = entry.querySelector('.lat')?.textContent || '';
+        const sb  = entry.querySelector('.star-btn');
+        if (!sb) return;
+        if (starred.has(lat)) { sb.textContent = '★'; sb.classList.add('starred'); }
+        else                  { sb.textContent = '☆'; sb.classList.remove('starred'); }
+      });
+      if (typeof updateStarredSection === 'function') updateStarredSection();
+    }
+  }
+
+  // Theme
+  if (data.theme) {
+    localStorage.setItem('latin-theme', data.theme);
+    const html = document.documentElement;
+    const btn  = document.getElementById('darkModeBtn');
+    if (data.theme === 'dark') {
+      html.dataset.theme = 'dark';
+      if (btn) btn.textContent = '☀ Light';
+    } else {
+      html.dataset.theme = '';
+      if (btn) btn.textContent = '☾ Dark';
+    }
+  }
+
+  // Font size
+  if (data.font_size) {
+    localStorage.setItem('latin-font-size', data.font_size);
+    document.documentElement.style.fontSize = data.font_size + 'px';
+    const sl = document.getElementById('font-size-slider');
+    const vl = document.getElementById('font-size-val');
+    if (sl) sl.value = data.font_size;
+    if (vl) vl.textContent = data.font_size + 'px';
+  }
+
+  // Volume
+  if (data.vol != null) {
+    localStorage.setItem('latin-vol', data.vol);
+    if (typeof SFX !== 'undefined') SFX.setVol(data.vol / 100);
+    const sl   = document.getElementById('vol-slider');
+    const vl   = document.getElementById('vol-val');
+    const icon = document.getElementById('vol-icon');
+    if (sl) sl.value = data.vol;
+    if (vl) vl.textContent = data.vol + '%';
+    if (icon) {
+      const v = data.vol;
+      icon.textContent = (v === 0 ? '🔇' : v < 35 ? '🔈' : v < 70 ? '🔉' : '🔊') + ' Volume';
+    }
+  }
+}
+
+// ── AUTH MODAL ───────────────────────────────────────────────────
+(function() {
+  if (!_sb) {
+    // Supabase CDN failed to load — hide auth button gracefully
+    const btn = document.getElementById('authBtn');
+    if (btn) btn.style.display = 'none';
+    return;
+  }
+  const overlay       = document.getElementById('authModalOverlay');
+  const closeBtn      = document.getElementById('authModalClose');
+  const authBtn       = document.getElementById('authBtn');
+  const tabSignIn     = document.getElementById('authTabSignIn');
+  const tabSignUp     = document.getElementById('authTabSignUp');
+  const tabs          = document.getElementById('authTabs');
+  const panelSignIn   = document.getElementById('authPanelSignIn');
+  const panelSignUp   = document.getElementById('authPanelSignUp');
+  const panelSignedIn = document.getElementById('authPanelSignedIn');
+  const msgEl         = document.getElementById('authMsg');
+
+  function showMsg(text, type) { msgEl.textContent = text; msgEl.className = 'auth-msg ' + type; }
+  function clearMsg()          { msgEl.className = 'auth-msg'; msgEl.textContent = ''; }
+
+  function openModal()  { overlay.classList.add('open'); clearMsg(); }
+  function closeModal() { overlay.classList.remove('open'); }
+
+  authBtn.addEventListener('click', openModal);
+  closeBtn.addEventListener('click', closeModal);
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && overlay.classList.contains('open')) closeModal();
+  });
+
+  // Tab switching
+  tabSignIn.addEventListener('click', () => {
+    tabSignIn.classList.add('active'); tabSignUp.classList.remove('active');
+    panelSignIn.style.display = ''; panelSignUp.style.display = 'none';
+    clearMsg();
+  });
+  tabSignUp.addEventListener('click', () => {
+    tabSignUp.classList.add('active'); tabSignIn.classList.remove('active');
+    panelSignUp.style.display = ''; panelSignIn.style.display = 'none';
+    clearMsg();
+  });
+
+  // Email sign-in
+  async function doSignIn() {
+    const email    = document.getElementById('authEmail').value.trim();
+    const password = document.getElementById('authPassword').value;
+    if (!email || !password) { showMsg('Enter your email and password.', 'error'); return; }
+    const btn = document.getElementById('authSignInBtn');
+    btn.disabled = true; btn.textContent = 'Signing in…';
+    const { error } = await _sb.auth.signInWithPassword({ email, password });
+    btn.disabled = false; btn.textContent = 'Sign In';
+    if (error) showMsg(error.message, 'error');
+    else closeModal();
+  }
+  document.getElementById('authSignInBtn').addEventListener('click', doSignIn);
+  document.getElementById('authEmail').addEventListener('keydown', e => { if (e.key === 'Enter') doSignIn(); });
+  document.getElementById('authPassword').addEventListener('keydown', e => { if (e.key === 'Enter') doSignIn(); });
+
+  // Email sign-up
+  async function doSignUp() {
+    const email    = document.getElementById('authEmailUp').value.trim();
+    const password = document.getElementById('authPasswordUp').value;
+    if (!email || !password) { showMsg('Enter your email and password.', 'error'); return; }
+    if (password.length < 6) { showMsg('Password must be at least 6 characters.', 'error'); return; }
+    const btn = document.getElementById('authSignUpBtn');
+    btn.disabled = true; btn.textContent = 'Creating account…';
+    const { error } = await _sb.auth.signUp({ email, password });
+    btn.disabled = false; btn.textContent = 'Create Account';
+    if (error) showMsg(error.message, 'error');
+    else showMsg('Check your email to confirm your account, then sign in.', 'success');
+  }
+  document.getElementById('authSignUpBtn').addEventListener('click', doSignUp);
+  document.getElementById('authPasswordUp').addEventListener('keydown', e => { if (e.key === 'Enter') doSignUp(); });
+
+  // Google OAuth
+  async function signInWithGoogle() {
+    const { error } = await _sb.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.href }
+    });
+    if (error) showMsg(error.message, 'error');
+  }
+  document.getElementById('authGoogleBtn').addEventListener('click', signInWithGoogle);
+  document.getElementById('authGoogleBtnUp').addEventListener('click', signInWithGoogle);
+
+  // Sign out
+  document.getElementById('authSignOutBtn').addEventListener('click', async () => {
+    await _sb.auth.signOut();
+    closeModal();
+  });
+
+  // Update header button + modal panels based on auth state
+  function updateAuthUI() {
+    if (_currentUser) {
+      const name = _currentUser.email?.split('@')[0] || 'Account';
+      authBtn.textContent = '👤 ' + name;
+      tabs.style.display          = 'none';
+      panelSignIn.style.display   = 'none';
+      panelSignUp.style.display   = 'none';
+      panelSignedIn.style.display = '';
+      document.getElementById('authUserEmail').textContent = _currentUser.email || '';
+    } else {
+      authBtn.textContent = '👤 Sign In';
+      tabs.style.display          = '';
+      panelSignedIn.style.display = 'none';
+      panelSignIn.style.display   = '';
+      tabSignIn.classList.add('active'); tabSignUp.classList.remove('active');
+    }
+  }
+
+  // Auth state listener (fires on sign-in, sign-out, token refresh)
+  _sb.auth.onAuthStateChange(async (event, session) => {
+    _currentUser = session?.user ?? null;
+    updateAuthUI();
+    if (event === 'SIGNED_IN') await _loadFromCloud();
+  });
+
+  // Restore session on page load (handles OAuth redirect)
+  _sb.auth.getSession().then(({ data: { session } }) => {
+    _currentUser = session?.user ?? null;
+    updateAuthUI();
+    if (_currentUser) _loadFromCloud();
+  });
+})();
+
 // ── HEADER HEIGHT SYNC ───────────────────────────────────────────
 // ── GLOBAL SEARCH ────────────────────────────────────────────────
 (function() {
@@ -2446,10 +2811,12 @@ table th, table td, .vocab-entry, .section-header,
   slider.addEventListener('input', () => {
     applyFontSize(slider.value);
     localStorage.setItem('latin-font-size', slider.value);
+    scheduleSyncToCloud();
   });
   document.getElementById('font-size-reset').addEventListener('click', () => {
     applyFontSize(15);
     localStorage.removeItem('latin-font-size');
+    scheduleSyncToCloud();
   });
 
   // Reset starred
@@ -2477,6 +2844,7 @@ table th, table td, .vocab-entry, .section-header,
     html.dataset.theme = isDark ? '' : 'dark';
     btn.textContent = isDark ? '☾ Dark' : '☀ Light';
     localStorage.setItem('latin-theme', isDark ? 'light' : 'dark');
+    scheduleSyncToCloud();
     SFX.darkToggle();
   });
 })();
@@ -2715,7 +3083,7 @@ wordModal.addEventListener('keydown', e => {
 // ── STAR FEATURE ─────────────────────────────────────────────────
 let starred = new Set(JSON.parse(localStorage.getItem('latin-starred') || '[]'));
 
-function saveStarred() { localStorage.setItem('latin-starred', JSON.stringify([...starred])); }
+function saveStarred() { localStorage.setItem('latin-starred', JSON.stringify([...starred])); scheduleSyncToCloud(); }
 
 function updateStarredSection() {
   const sec  = document.getElementById('starred-section');
@@ -3866,6 +4234,7 @@ document.querySelectorAll('.section-header').forEach(hdr => {
     volVal.textContent = v + '%';
     volIcon.textContent = iconFor(v) + ' Volume';
     localStorage.setItem('latin-vol', v);
+    scheduleSyncToCloud();
   }
   const saved = localStorage.getItem('latin-vol');
   applyVol(saved !== null ? Number(saved) : 50);
@@ -3873,6 +4242,65 @@ document.querySelectorAll('.section-header').forEach(hdr => {
 })();
 
 </script>
+
+<!-- ── AUTH MODAL ──────────────────────────────────────────────── -->
+<div class="auth-modal-overlay" id="authModalOverlay">
+  <div class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="authModalTitle">
+    <button class="auth-modal-close" id="authModalClose" aria-label="Close">×</button>
+    <h2 id="authModalTitle">Account</h2>
+
+    <!-- Sign-in / sign-up tabs (hidden when signed in) -->
+    <div class="auth-tabs" id="authTabs">
+      <button class="auth-tab active" id="authTabSignIn">Sign In</button>
+      <button class="auth-tab" id="authTabSignUp">Sign Up</button>
+    </div>
+
+    <!-- Sign-in panel -->
+    <div id="authPanelSignIn">
+      <div class="auth-field">
+        <label for="authEmail">Email</label>
+        <input type="email" id="authEmail" placeholder="you@example.com" autocomplete="email">
+      </div>
+      <div class="auth-field">
+        <label for="authPassword">Password</label>
+        <input type="password" id="authPassword" placeholder="Password" autocomplete="current-password">
+      </div>
+      <button class="auth-btn-primary" id="authSignInBtn">Sign In</button>
+      <div class="auth-divider">or</div>
+      <button class="auth-btn-google" id="authGoogleBtn">
+        <svg width="17" height="17" viewBox="0 0 18 18" fill="none"><path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 002.38-5.88c0-.57-.05-.66-.15-1.18z"/><path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 01-7.18-2.54H1.83v2.07A8 8 0 008.98 17z"/><path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 010-3.04V5.41H1.83a8 8 0 000 7.18l2.67-2.07z"/><path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 001.83 5.4L4.5 7.49a4.77 4.77 0 014.48-3.3z"/></svg>
+        Continue with Google
+      </button>
+    </div>
+
+    <!-- Sign-up panel -->
+    <div id="authPanelSignUp" style="display:none">
+      <div class="auth-field">
+        <label for="authEmailUp">Email</label>
+        <input type="email" id="authEmailUp" placeholder="you@example.com" autocomplete="email">
+      </div>
+      <div class="auth-field">
+        <label for="authPasswordUp">Password</label>
+        <input type="password" id="authPasswordUp" placeholder="At least 6 characters" autocomplete="new-password">
+      </div>
+      <button class="auth-btn-primary" id="authSignUpBtn">Create Account</button>
+      <div class="auth-divider">or</div>
+      <button class="auth-btn-google" id="authGoogleBtnUp">
+        <svg width="17" height="17" viewBox="0 0 18 18" fill="none"><path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 002.38-5.88c0-.57-.05-.66-.15-1.18z"/><path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 01-7.18-2.54H1.83v2.07A8 8 0 008.98 17z"/><path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 010-3.04V5.41H1.83a8 8 0 000 7.18l2.67-2.07z"/><path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 001.83 5.4L4.5 7.49a4.77 4.77 0 014.48-3.3z"/></svg>
+        Continue with Google
+      </button>
+    </div>
+
+    <!-- Signed-in panel -->
+    <div id="authPanelSignedIn" style="display:none">
+      <p class="auth-signed-in-info">Signed in as <strong id="authUserEmail"></strong></p>
+      <p class="auth-signed-in-note">Your starred words, preferences, and settings sync automatically across devices.</p>
+      <button class="auth-btn-primary" id="authSignOutBtn" style="background:var(--muted)">Sign Out</button>
+    </div>
+
+    <div id="authMsg" class="auth-msg"></div>
+  </div>
+</div>
 
 </body>
 </html>
